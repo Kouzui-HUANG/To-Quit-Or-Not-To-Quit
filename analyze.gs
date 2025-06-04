@@ -30,7 +30,7 @@ function onFormSubmit(e) {
   var score = calculateScore(e.namedValues);
   var message = getResultMessage(score);
   var advice = getLowScoreAdvice(e.namedValues);
-  var email = e.namedValues['若您希望收到ChatGPT給您的簡易分析與建議，請留下 Email（選填）'];
+  var email = e.namedValues['若您希望在一週後收到您與其他填答者的比較分析，請留下 Email（選填）'];
   if (email) {
     var body = '您的總分為 ' + score + ' 分。\n' + message;
     if (advice) {
