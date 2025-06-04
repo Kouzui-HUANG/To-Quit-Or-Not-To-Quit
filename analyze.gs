@@ -29,7 +29,7 @@ var QUESTIONS = [
 function onFormSubmit(e) {
   var score = calculateScore(e.namedValues);
   var message = getResultMessage(score);
-  var advice = getLowScoreAdvice(e.namedValues);
+  var advice = getLowScoreAdvice(e.namedValues, score, message);
   var email = e.namedValues['若您希望在一週後收到您與其他填答者的比較分析，請留下 Email（選填）'];
   if (email) {
     var body = '您的總分為 ' + score + ' 分。\n' + message;
@@ -49,7 +49,7 @@ function calculateScore(namedValues) {
   return sum;
 }
 
-function getLowScoreAdvice(namedValues) {
+function getLowScoreAdvice(namedValues, score, message) {
   var lows = [];
   for (var i = 0; i < QUESTIONS.length; i++) {
     if (parseFloat(namedValues[QUESTIONS[i]]) === 1) {
@@ -58,8 +58,8 @@ function getLowScoreAdvice(namedValues) {
   }
   if (lows.length === 0) return '';
 
-  var systemPrompt = '你是一位職涯顧問，根據使用者提供的題目，給出改善建議，使用繁體中文並盡量精簡在300字以內。';
-  var userPrompt = '以下題目我選擇了 1 分（非常不同意），請提供建議：\n' + lows.join('\n');
+  var systemPrompt = '你是一位職涯顧問，根據使用者提供的題目與總分評語，給出改善建議，使用繁體中文並盡量精簡在300字以內。';
+  var userPrompt = '我的總分為 ' + score + ' 分，代表「' + message + '」。以下題目我選擇了 1 分（非常不同意），請提供建議：\n' + lows.join('\n');
   return ChatGPT(userPrompt, systemPrompt, 500);
 }
 
