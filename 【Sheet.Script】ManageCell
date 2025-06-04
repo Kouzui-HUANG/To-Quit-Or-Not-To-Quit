@@ -1,0 +1,432 @@
+function ManageCellValue(action, sheetName, cellAddress, setValue) {
+  // Ver 20241122
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+
+  // 檢查該工作表是否存在
+  if (!sheet) {
+    throw new Error("工作表 " + sheetName + " 不存在。");
+  }
+
+  // 初始化範圍
+  var range;
+  var rangeRow;
+  var rangeColumn;
+
+  // 如果 cellAddress 是單個字母，表示是一個欄
+  if (/^[A-Z]+$/.test(cellAddress)) {
+    rangeColumn = sheet.getRange(cellAddress + "1").getColumn();
+    
+    // 從指定欄（即 rangeColumn）中找到最後一個非空儲存格的行號
+    rangeRow = sheet.getRange(cellAddress + ":" + cellAddress).getValues().filter(String).length;
+    rangeRow += 1; // 在最後一行之後寫入
+    
+    range = sheet.getRange(rangeRow, rangeColumn);
+  } else {
+    range = sheet.getRange(cellAddress);
+    rangeRow = range.getRow();
+    rangeColumn = range.getColumn();
+  }
+
+  // 轉換為大寫進行比較
+  action = action.toUpperCase();
+
+  if (action === "GET") {
+    // 判斷是單個儲存格還是一個範圍
+    if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
+      return range.getValue();
+    } else {
+      // 取得範圍的所有值
+      var values = range.getValues();
+      // 過濾掉空白的行和欄
+      values = values.map(function(row) {
+        return row.filter(function(cell) { return cell !== ""; });
+      }).filter(function(row) {
+        return row.length > 0;
+      });
+      // 如果只有一行有內容，則返回那一行，否則返回整個範圍
+      if (values.length === 1) {
+        return values[0];
+      } else {
+        return values;
+      }
+    }
+
+  } else if (action === "GET_ALL") {
+    // 判斷是單個單元格還是一個範圍
+    if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
+      return range.getValue();
+    } else {
+      // 取得範圍的所有值
+      var values = range.getValues();
+   
+      // 如果只有一行有內容，則返回那一行，否則返回整個範圍
+      if (values.length === 1) {
+        return values[0];
+      } else {
+        return values;
+      }
+    }
+
+  } else if (action === "SET") {
+    if (setValue === undefined) {
+      throw new Error("For SET action, you must provide a value to set.");
+    }
+
+    // 判斷 setValue 是單個值、一維陣列還是二維陣列
+    if (Array.isArray(setValue)) {
+      if (Array.isArray(setValue[0])) {
+        // 二維陣列：從指定位置向右下方向擴展
+        range = sheet.getRange(rangeRow, rangeColumn, setValue.length, setValue[0].length);
+        range.setValues(setValue);
+      } else {
+        // 一維陣列：從指定位置向下擴展
+        range = sheet.getRange(rangeRow, rangeColumn, setValue.length, 1);
+        var verticalArray = setValue.map(function(item) {
+          return [item];
+        });
+        range.setValues(verticalArray);
+      }
+    } else {
+      // 單個值
+      range.setValue(setValue);
+    }
+    return "Value set successfully!";
+  } else {
+    return "Please decide GET or SET";
+  }
+}
+
+
+
+
+/**
+ * 管理Google工作表中的单元格值。
+ * 
+ * @param {string} action 执行的操作，可以是"GET"或"SET"，不区分大小写。
+ *    - "GET": 从指定单元格或范围获取值。
+ *    - "SET": 设置指定单元格或范围的值。
+ * @param {string} sheetName 工作表的名称。
+ * @param {number} row 行号（从1开始）。
+ * @param {number} column 列号（从1开始）。
+ * @param {any} [setValue] 当执行"SET"操作时，设置单元格的值。可以是以下几种类型：
+ *    - 单个值（如数字、字符串）：设置单个单元格的值。
+ *    - 一维数组：将数组中的每个值依次设置在指定的行列开始的垂直列中。
+ *    - 二维数组：从指定的行列开始，将数组中的值按照其在数组中的结构向右和向下扩展。
+ * @returns {any} 
+ *    - 如果是"GET"操作，返回单个值或包含值的数组。
+ *    - 如果是"SET"操作，返回一个字符串表示成功设置。
+ * @throws 如果工作表不存在或未提供设置值，或提供了无效的参数，则抛出错误。
+ */
+function ManageCellValueV2(action, sheetName, row, column, setValue) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+
+  // 检查该工作表是否存在
+  if (!sheet) {
+    throw new Error("工作表 " + sheetName + " 不存在。");
+  }
+
+  // 转换为大写进行比较
+  action = action.toUpperCase();
+
+  if (action === "GET") {
+    // 获取单个单元格的值
+    var range = sheet.getRange(row, column);
+    return range.getValue();
+  } else if (action === "SET") {
+    if (setValue === undefined) {
+      throw new Error("For SET action, you must provide a value to set.");
+    }
+    // 判断setValue是单个值、一维数组还是二维数组
+    if (Array.isArray(setValue)) {
+      if (Array.isArray(setValue[0])) {
+        // 二维数组：从指定的行列开始向右下方向扩展
+        var numRows = setValue.length;
+        var numCols = setValue[0].length;
+        var range = sheet.getRange(row, column, numRows, numCols);
+        range.setValues(setValue);
+      } else {
+        // 一维数组：从指定的行列开始向下扩展
+        var numRows = setValue.length;
+        var range = sheet.getRange(row, column, numRows, 1);
+        var verticalArray = setValue.map(function(item) { return [item]; });
+        range.setValues(verticalArray);
+      }
+    } else {
+      // 单个值
+      var range = sheet.getRange(row, column);
+      range.setValue(setValue);
+    }
+    return "Value set successfully!";
+  } else {
+    throw new Error("Invalid action. Only 'GET' and 'SET' are supported.");
+  }
+}
+
+
+/**
+ * 管理指定Google工作表中的单元格值。
+ * 
+ * @param {string} url Google Sheets的網址。
+ * @param {string} action 执行的操作，可以是"GET"或"SET"，不区分大小写。
+ *    - "GET": 从指定单元格或范围获取值。
+ *    - "SET": 设置指定单元格或范围的值。
+ * @param {string} sheetName 工作表的名称。
+ * @param {string} cellAddress 单元格或范围的地址（例如：A1, A1:B2）。
+ *    - 在"GET"操作中，这表示要读取值的单元格或范围。
+ *    - 在"SET"操作中，这表示要设置值的起始单元格。根据提供的值的类型（单个值、一维数组或二维数组），值将从这里开始向下或向右下方向扩展。
+ * @param {any} [setValue] 当执行"SET"操作时，设置单元格的值。可以是以下几种类型：
+ *    - 单个值（如数字、字符串）：设置单个单元格的值。
+ *    - 一维数组：将数组中的每个值依次设置在从cellAddress开始的垂直列中。
+ *    - 二维数组：从cellAddress开始，将数组中的值按照其在数组中的结构向右和向下扩展。
+ * @returns {any} 
+ *    - 如果是"GET"操作，返回单个值或包含值的数组。
+ *    - 如果是"SET"操作，返回一个字符串表示成功设置。
+ * @throws 如果工作表不存在或未提供设置值，或提供了无效的参数，则抛出错误。
+ */
+function ManageCellValueV3(url,action, sheetName, cellAddress, setValue) {
+  //Ver　20240514
+  var ss = SpreadsheetApp.openByUrl(url);
+  
+  var sheet = ss.getSheetByName(sheetName);
+
+  // 检查该工作表是否存在
+  if (!sheet) {
+    throw new Error("工作表 " + sheetName + " 不存在。");
+  }
+
+  var range = sheet.getRange(cellAddress); // 初始化 range;
+  var rangeRow = sheet.getRange(cellAddress).getRow();
+  var rangeColumn = sheet.getRange(cellAddress).getColumn();
+
+  // 转换为大写进行比较
+  action = action.toUpperCase();
+
+  if (action === "GET") {
+    // 判斷是單個單元格還是一個範圍
+    if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
+      return range.getValue();
+    } else {
+      // 取得範圍的所有值
+      var values = range.getValues();
+      // 過濾掉空白的行
+      values = values.filter(function(row) {
+        return row.some(function(cell) { return cell !== ""; });
+      });
+      // 如果只有一行有內容，則返回那一行，否則返回整個範圍
+      if (values.length === 1) {
+        return values[0];
+      } else {
+        return values;
+      }
+    }
+  
+  } else if (action === "GETB") {
+    // 判斷是單個單元格還是一個範圍
+    if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
+      return range.getValue();
+    } else {
+      // 取得範圍的所有值
+      var values = range.getValues();
+   
+      // 如果只有一行有內容，則返回那一行，否則返回整個範圍
+      if (values.length === 1) {
+        return values[0];
+      } else {
+        return values;
+      }
+    }
+
+
+  }else if (action === "SET") {
+    if (setValue === undefined) {
+      throw new Error("For SET action, you must provide a value to set.");
+    }
+    // 判断setValue是单个值、一维数组还是二维数组
+    if (Array.isArray(setValue)) {
+      if (Array.isArray(setValue[0])) {
+        // 二维数组：从A2向右下方向扩展
+        range = sheet.getRange(rangeRow, rangeColumn, setValue.length, setValue[0].length);
+        range.setValues(setValue);
+      } else {
+        // 一维数组：从A2开始向下扩展
+        range = sheet.getRange(rangeRow, rangeColumn, setValue.length, 1);
+        var verticalArray = setValue.map(function(item) {
+          return [item];
+        });
+        range.setValues(verticalArray);
+      }
+    } else {
+      // 单个值
+      range = sheet.getRange(cellAddress);
+      range.setValue(setValue);
+    }
+    return "Value set successfully!";
+  } else {
+    return "Please decide GET or SET";
+  }
+}
+
+/**
+ * 測試 ManageCellValue 函數的各種情境。
+ */
+function testManageCellValue() {
+  var testSheetName = "TestSheet";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(testSheetName);
+  
+  // 如果 TestSheet 不存在，則創建它
+  if (!sheet) {
+    sheet = ss.insertSheet(testSheetName);
+  } else {
+    sheet.clear(); // 清空現有內容
+  }
+  
+  // 輔助函數：斷言兩個值相等
+  function assertEqual(actual, expected, testName) {
+    var passed = false;
+    if (Array.isArray(expected)) {
+      // 深度比較陣列
+      passed = JSON.stringify(actual) === JSON.stringify(expected);
+    } else {
+      passed = (actual === expected);
+    }
+    
+    if (passed) {
+      Logger.log("✅ " + testName + " passed.");
+    } else {
+      Logger.log("❌ " + testName + " failed. Expected: " + JSON.stringify(expected) + ", but got: " + JSON.stringify(actual));
+    }
+  }
+  
+  // 輔助函數：斷言函數拋出預期的錯誤
+  function assertThrows(func, expectedError, testName) {
+    try {
+      func();
+      Logger.log("❌ " + testName + " failed. Expected error: " + expectedError + ", but no error was thrown.");
+    } catch (e) {
+      if (e.message === expectedError) {
+        Logger.log("✅ " + testName + " passed.");
+      } else {
+        Logger.log("❌ " + testName + " failed. Expected error: " + expectedError + ", but got: " + e.message);
+      }
+    }
+  }
+  
+  // 測試案例 1：SET 單一值
+  var setResult1 = ManageCellValue("SET", testSheetName, "A1", "Hello");
+  assertEqual(setResult1, "Value set successfully!", "SET 單一值");
+  
+  // 測試案例 2：GET 單一值
+  var getResult1 = ManageCellValue("GET", testSheetName, "A1");
+  assertEqual(getResult1, "Hello", "GET 單一值");
+  
+  // 測試案例 3：SET 一維陣列
+  var setArray1 = ["Apple", "Banana", "Cherry"];
+  var setResult2 = ManageCellValue("SET", testSheetName, "B1", setArray1);
+  assertEqual(setResult2, "Value set successfully!", "SET 一維陣列");
+  
+  // 測試案例 4：GET 範圍（濾掉空白）
+  var getResult2 = ManageCellValue("GET", testSheetName, "B1:B3");
+  var expectedGet2 = [["Apple"], ["Banana"], ["Cherry"]];
+  assertEqual(getResult2, expectedGet2, "GET 範圍（濾掉空白）");
+  
+  // 測試案例 5：SET 二維陣列
+  var setArray2 = [
+    ["A1", "B1"],
+    ["A2", "B2"]
+  ];
+  var setResult3 = ManageCellValue("SET", testSheetName, "C1", setArray2);
+  assertEqual(setResult3, "Value set successfully!", "SET 二維陣列");
+  
+  // 測試案例 6：GET 範圍（濾掉空白）
+  var getResult3 = ManageCellValue("GET", testSheetName, "C1:D2");
+  assertEqual(getResult3, setArray2, "GET 範圍（濾掉空白） 二維陣列");
+  
+  // 測試案例 7：GET_ALL 單一值
+  var getAllResult1 = ManageCellValue("GET_ALL", testSheetName, "A1");
+  assertEqual(getAllResult1, "Hello", "GET_ALL 單一值");
+  
+  // 測試案例 8：GET_ALL 範圍（不濾掉空白）
+  // 首先在範圍中加入一些空白儲存格
+  sheet.getRange("C3").setValue("");
+  sheet.getRange("D3").setValue("D3Value");
+  var getAllResult2 = ManageCellValue("GET_ALL", testSheetName, "C1:D3");
+  var expectedGetAll2 = [
+    ["A1", "B1"],
+    ["A2", "B2"],
+    ["", "D3Value"]
+  ];
+  assertEqual(getAllResult2, expectedGetAll2, "GET_ALL 範圍（不濾掉空白）");
+  
+  // 測試案例 9：SET 時未提供 setValue
+  assertThrows(
+    function() {
+      ManageCellValue("SET", testSheetName, "E1");
+    },
+    "For SET action, you must provide a value to set.",
+    "SET 未提供 setValue"
+  );
+  
+  // 測試案例 10：參考不存在的工作表
+  assertThrows(
+    function() {
+      ManageCellValue("GET", "NonExistentSheet", "A1");
+    },
+    "工作表 NonExistentSheet 不存在。",
+    "參考不存在的工作表"
+  );
+  
+  // 測試案例 11：SET 從單一列開始（例如 "A")
+  // 首先清空 A 列
+  sheet.getRange("A:A").clearContent();
+  var setResult4 = ManageCellValue("SET", testSheetName, "A", "ColumnStart");
+  assertEqual(setResult4, "Value set successfully!", "SET 從單一列開始");
+  
+  var getResult4 = ManageCellValue("GET", testSheetName, "A1");
+  assertEqual(getResult4, "ColumnStart", "GET 從單一列開始 設定值");
+  
+  // 測試案例 12：SET 一維陣列從單一列開始
+  var setArray3 = ["Row1", "Row2", "Row3"];
+  var setResult5 = ManageCellValue("SET", testSheetName, "A", setArray3);
+  assertEqual(setResult5, "Value set successfully!", "SET 一維陣列從單一列開始");
+  
+  var getResult5 = ManageCellValue("GET", testSheetName, "A1:A4");
+  var expectedGet5 = [["ColumnStart"], ["Row1"], ["Row2"], ["Row3"]];
+  assertEqual(getResult5, expectedGet5, "GET 一維陣列從單一列開始");
+  
+  // 測試案例 13：SET 二維陣列從單一列開始
+  var setArray4 = [
+    ["X1", "Y1"],
+    ["X2", "Y2"]
+  ];
+  var setResult6 = ManageCellValue("SET", testSheetName, "F", setArray4);
+  assertEqual(setResult6, "Value set successfully!", "SET 二維陣列從單一列開始");
+  
+  var getResult6 = ManageCellValue("GET", testSheetName, "F1:G2");
+  assertEqual(getResult6, setArray4, "GET 二維陣列從單一列開始");
+  
+  // 測試案例 14：操作無效的 action
+  var getInvalidAction = ManageCellValue("INVALID_ACTION", testSheetName, "A1");
+  assertEqual(getInvalidAction, "Please decide GET or SET", "操作無效的 action");
+  
+  // 測試案例 15：GET 範圍全部為空
+  sheet.getRange("H1:H3").clearContent();
+  var getResult7 = ManageCellValue("GET", testSheetName, "H1:H3");
+  assertEqual(getResult7, [], "GET 範圍全部為空");
+  
+  // 測試案例 16：GET_ALL 範圍全部為空
+  var getAllResult3 = ManageCellValue("GET_ALL", testSheetName, "H1:H3");
+  var expectedGetAll3 = [
+    ["",],
+    ["",],
+    ["",]
+  ];
+  assertEqual(getAllResult3, expectedGetAll3, "GET_ALL 範圍全部為空");
+
+  
+  
+  // 測試完成
+  Logger.log("所有測試完成。");
+}
