@@ -1,4 +1,3 @@
-// 問卷所有題目，依序對應到三大面向
 var QUESTIONS = [
   '過去三個月內，我至少參加或自學一項新技能並已在工作中實際應用。',
   '每週至少有一項任務需要我嘗試之前未操作過的工具或方法。',
@@ -27,42 +26,41 @@ var QUESTIONS = [
   '我負責的專業技能在主要招聘網站的需求量於過去一年保持穩定或上升。'
 ];
 
-// 各面向題目數量，用於計算平均
-var CATEGORY_COUNTS = {
-  work: 12,
-  life: 7,
-  reward: 6
-};
-
 function onFormSubmit(e) {
   var score = calculateScore(e.namedValues);
   var message = getResultMessage(score);
+  var advice = getLowScoreAdvice(e.namedValues, score, message);
   var email = e.namedValues['若您希望在一週後收到您與其他填答者的比較分析，請留下 Email（選填）'];
-  var stats = computeStatistics();
-  updateSummarySheet(stats);
-
   if (email) {
-    GmailApp.sendEmail(email, '離職自我檢測量表分析結果', '您的總分為 ' + score + ' 分。\n' + message);
-
-    var trigger = ScriptApp.newTrigger('sendScheduledEmail')
-      .timeBased()
-      .after(7 * 24 * 60 * 60 * 1000)
-      .create();
-    PropertiesService.getScriptProperties().setProperty(
-      trigger.getUniqueId(),
-      JSON.stringify({ email: email, userAvg: score / QUESTIONS.length })
-    );
+    var body = '您的總分為 ' + score + ' 分。\n' + message;
+    if (advice) {
+      body += '\n\n根據您給 1 分的項目，以下是一些建議：\n' + advice;
+    }
+    GmailApp.sendEmail(email, '離職自我檢測量表分析結果', body);
   }
 }
 
 function calculateScore(namedValues) {
-  var questions = QUESTIONS;
   var sum = 0;
-  for (var i = 0; i < questions.length; i++) {
-    var v = parseFloat(namedValues[questions[i]]);
+  for (var i = 0; i < QUESTIONS.length; i++) {
+    var v = parseFloat(namedValues[QUESTIONS[i]]);
     if (!isNaN(v)) sum += v;
   }
   return sum;
+}
+
+function getLowScoreAdvice(namedValues, score, message) {
+  var lows = [];
+  for (var i = 0; i < QUESTIONS.length; i++) {
+    if (parseFloat(namedValues[QUESTIONS[i]]) === 1) {
+      lows.push(QUESTIONS[i]);
+    }
+  }
+  if (lows.length === 0) return '';
+
+  var systemPrompt = '你是一位職涯顧問，根據使用者提供的題目與總分評語，給出改善建議，使用繁體中文並盡量精簡在300字以內。';
+  var userPrompt = '我的總分為 ' + score + ' 分，代表「' + message + '」。以下題目我選擇了 1 分（非常不同意），請提供建議：\n' + lows.join('\n');
+  return ChatGPT(userPrompt, systemPrompt, 500);
 }
 
 function getResultMessage(score) {
@@ -75,118 +73,4 @@ function getResultMessage(score) {
   } else {
     return '離職動機高，請同步準備履歷、財務緩衝與外部機會。';
   }
-}
-
-// === 統計計算與排程 ===
-
-function computeStatistics() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Form Responses 1');
-  if (!sheet) return null;
-
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return null;
-
-  var headers = data[0];
-  var indices = QUESTIONS.map(function (q) {
-    return headers.indexOf(q);
-  });
-  var workIdx = indices.slice(0, CATEGORY_COUNTS.work);
-  var lifeIdx = indices.slice(CATEGORY_COUNTS.work, CATEGORY_COUNTS.work + CATEGORY_COUNTS.life);
-  var rewardIdx = indices.slice(CATEGORY_COUNTS.work + CATEGORY_COUNTS.life);
-
-  var totalArr = [];
-  var workArr = [];
-  var lifeArr = [];
-  var rewardArr = [];
-
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-
-    var total = 0;
-    var work = 0;
-    var life = 0;
-    var reward = 0;
-
-    workIdx.forEach(function (i) {
-      var v = parseFloat(row[i]);
-      if (!isNaN(v)) work += v;
-    });
-
-    lifeIdx.forEach(function (i) {
-      var v = parseFloat(row[i]);
-      if (!isNaN(v)) life += v;
-    });
-
-    rewardIdx.forEach(function (i) {
-      var v = parseFloat(row[i]);
-      if (!isNaN(v)) reward += v;
-    });
-
-    total = work + life + reward;
-
-    totalArr.push(total / QUESTIONS.length);
-    workArr.push(work / CATEGORY_COUNTS.work);
-    lifeArr.push(life / CATEGORY_COUNTS.life);
-    rewardArr.push(reward / CATEGORY_COUNTS.reward);
-  }
-
-  return {
-    total: { mean: mean(totalArr), median: median(totalArr) },
-    work: { mean: mean(workArr), median: median(workArr) },
-    life: { mean: mean(lifeArr), median: median(lifeArr) },
-    reward: { mean: mean(rewardArr), median: median(rewardArr) }
-  };
-}
-
-function mean(arr) {
-  if (arr.length === 0) return 0;
-  return arr.reduce(function (a, b) { return a + b; }, 0) / arr.length;
-}
-
-function median(arr) {
-  if (arr.length === 0) return 0;
-  var copy = arr.slice().sort(function (a, b) { return a - b; });
-  var mid = Math.floor(copy.length / 2);
-  if (copy.length % 2 === 0) {
-    return (copy[mid - 1] + copy[mid]) / 2;
-  } else {
-    return copy[mid];
-  }
-}
-
-function updateSummarySheet(stats) {
-  if (!stats) return;
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('統計');
-  if (!sheet) {
-    sheet = ss.insertSheet('統計');
-  } else {
-    sheet.clear();
-  }
-  sheet.appendRow(['項目', '平均', '中位數']);
-  sheet.appendRow(['總分', stats.total.mean, stats.total.median]);
-  sheet.appendRow(['工作與環境', stats.work.mean, stats.work.median]);
-  sheet.appendRow(['身心與生活', stats.life.mean, stats.life.median]);
-  sheet.appendRow(['報酬與市場機會', stats.reward.mean, stats.reward.median]);
-}
-
-function sendScheduledEmail(e) {
-  var props = PropertiesService.getScriptProperties();
-  var id = e.triggerUid;
-  var data = props.getProperty(id);
-  if (!data) return;
-  var info = JSON.parse(data);
-
-  var stats = computeStatistics();
-  var body = '您七天前填答的平均分數為 ' + info.userAvg.toFixed(2) + '。\n' +
-             '目前所有填答者的平均分數為 ' + stats.total.mean.toFixed(2) + '。';
-  GmailApp.sendEmail(info.email, '離職自我檢測量表比較結果', body);
-
-  props.deleteProperty(id);
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getUniqueId() === id) {
-      ScriptApp.deleteTrigger(t);
-    }
-  });
 }

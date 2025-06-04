@@ -1,0 +1,24 @@
+function ChatGPT(user_prompt, system_prompt , max ,model , temperature) {
+  //gpt-4o-mini
+  //gpt-4o
+
+  const url = "https://api.openai.com/v1/chat/completions";
+  const payload = {
+    model: model|| "gpt-4o",
+    messages: [
+      { role: "system", content: system_prompt },
+      { role: "user", content: user_prompt },
+    ],
+    temperature: temperature || 0.3,
+    max_tokens: max || 500,
+  };
+  const options = {
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + OPENAI_API_KEY },
+    payload: JSON.stringify(payload),
+  };
+
+
+  const res = JSON.parse(UrlFetchApp.fetch(url, options).getContentText());
+  return res.choices[0].message.content.trim();
+}
