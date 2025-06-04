@@ -30,7 +30,7 @@ function onFormSubmit(e) {
   var score = calculateScore(e.namedValues);
   var message = getResultMessage(score);
   var advice = getLowScoreAdvice(e.namedValues);
-  var email = e.namedValues['若您希望在一週後收到您與其他填答者的比較分析，請留下 Email（選填）'];
+  var email = e.namedValues['若您希望收到ChatGPT給您的簡易分析與建議，請留下 Email（選填）'];
   if (email) {
     var body = '您的總分為 ' + score + ' 分。\n' + message;
     if (advice) {
@@ -58,9 +58,9 @@ function getLowScoreAdvice(namedValues) {
   }
   if (lows.length === 0) return '';
 
-  var systemPrompt = '你是一位職涯顧問，根據使用者提供的題目，給出改善建議，使用繁體中文並盡量精簡。';
+  var systemPrompt = '你是一位職涯顧問，根據使用者提供的題目，給出改善建議，使用繁體中文並盡量精簡在300字以內。';
   var userPrompt = '以下題目我選擇了 1 分（非常不同意），請提供建議：\n' + lows.join('\n');
-  return ChatGPT(userPrompt, systemPrompt, 300);
+  return ChatGPT(userPrompt, systemPrompt, 500);
 }
 
 function getResultMessage(score) {
