@@ -4,7 +4,7 @@ function ChatGPT(user_prompt, system_prompt , max ,model , temperature) {
 
   const url = "https://api.openai.com/v1/chat/completions";
   const payload = {
-    model: model|| "gpt-4o-mini",
+    model: model|| "gpt-4o",
     messages: [
       { role: "system", content: system_prompt },
       { role: "user", content: user_prompt },
